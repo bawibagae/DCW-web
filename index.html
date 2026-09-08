@@ -39,13 +39,11 @@
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
         .account-info {
             font-size: 14px;
             color: #333;
+            margin-bottom: 8px;
         }
         .account-info strong {
             display: block;
@@ -54,14 +52,15 @@
             margin-bottom: 4px;
         }
         .copy-btn {
-            background-color: #e2e8f0;
+            width: 100%;
+            background-color: #3b82f6;
+            color: white;
             border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
-            color: #444;
         }
         .member-list {
             display: flex;
@@ -96,8 +95,6 @@
             font-weight: bold;
             font-size: 14px;
             cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
         }
         .empty-notice {
             text-align: center;
@@ -110,7 +107,7 @@
 
 <div class="container">
     <h1>💸 더치페이 정산 요청</h1>
-    <p class="subtitle">본인 이름을 확인하고 카카오페이로 송금해 주세요.</p>
+    <p class="subtitle">본인 이름을 확인하고 금액에 맞게 송금해 주세요.</p>
 
     <div id="account-container"></div>
     <div id="member-container" class="member-list"></div>
@@ -133,12 +130,12 @@
                     <strong>입금 계좌 안내</strong>
                     ${bank} ${acc}
                 </div>
-                <button class="copy-btn" onclick="copyAccount('${acc}')">계좌 복사</button>
+                <button class="copy-btn" onclick="copyAccount('${acc}')">계좌번호 복사하기</button>
             </div>
         `;
     }
 
-    // 카카오페이 및 참여자 목록 표시
+    // 참여자 목록 표시
     if (rawData) {
         const members = rawData.split(',');
         
@@ -146,9 +143,6 @@
             const [name, amount] = memberStr.split(':');
             if (name && amount) {
                 const formattedAmount = Number(amount).toLocaleString();
-                
-                // 카카오페이 송금 링크 생성
-                const targetPayUrl = `https://qr.kakaopay.com/send?amount=${amount}`;
 
                 const card = document.createElement('div');
                 card.className = 'member-card';
@@ -157,7 +151,7 @@
                         <div class="name">${name}</div>
                         <div class="amount">${formattedAmount}원</div>
                     </div>
-                    <a href="${targetPayUrl}" class="pay-btn" target="_blank">송금하기</a>
+                    <button class="pay-btn" onclick="handlePay('${acc}', '${amount}')">복사 후 송금</button>
                 `;
                 memberContainer.appendChild(card);
             }
@@ -171,11 +165,25 @@
     }
 
     function copyAccount(accNum) {
+        if (!accNum) {
+            alert('등록된 계좌번호가 없습니다.');
+            return;
+        }
         navigator.clipboard.writeText(accNum).then(() => {
             alert('계좌번호가 복사되었습니다!');
         }).catch(() => {
-            alert('복사에 실패했습니다. 직접 복사해 주세요.');
+            alert('계좌번호 복사에 실패했습니다.');
         });
+    }
+
+    function handlePay(accNum, amount) {
+        if (accNum) {
+            navigator.clipboard.writeText(accNum).then(() => {
+                alert(`계좌번호(${accNum})가 복사되었습니다.\n입금할 금액: ${Number(amount).toLocaleString()}원`);
+            });
+        } else {
+            alert(`입금할 금액: ${Number(amount).toLocaleString()}원`);
+        }
     }
 </script>
 
