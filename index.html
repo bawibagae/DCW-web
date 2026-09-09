@@ -2,173 +2,299 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>더치페이 정산하기</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>🧾 더치페이 정산 요청</title>
     <style>
       * {
         box-sizing: border-box;
+        margin: 0;
+        padding: 0;
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
       }
       body {
-        background-color: #f5f5f5;
-        margin: 0;
-        padding: 20px;
+        background-color: #f4f6f8;
+        color: #333;
         display: flex;
         justify-content: center;
+        padding: 20px 16px 40px;
       }
       .container {
         width: 100%;
-        max-width: 480px;
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        max-width: 440px;
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 24px 20px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
       }
-      h1 {
-        font-size: 20px;
-        margin-bottom: 8px;
-        color: #333;
+      .header {
+        text-align: center;
+        margin-bottom: 24px;
       }
-      p.subtitle {
+      .header h2 {
+        font-size: 22px;
+        color: #1a1d20;
+        margin-bottom: 6px;
+      }
+      .header p {
         font-size: 14px;
-        color: #666;
-        margin-bottom: 16px;
+        color: #6c757d;
       }
-      .account-box {
-        background-color: #f0f4f9;
-        border-radius: 12px;
+      .bank-card {
+        background-color: #eef2ff;
+        border-radius: 14px;
         padding: 16px;
         margin-bottom: 20px;
+        text-align: center;
+        border: 1px solid #dbe2fe;
       }
-      .account-info {
-        font-size: 14px;
-        color: #333;
-      }
-      .account-info strong {
-        display: block;
-        font-size: 15px;
-        color: #111;
+      .bank-name {
+        font-size: 13px;
+        color: #4f46e5;
+        font-weight: 600;
         margin-bottom: 4px;
       }
-      .member-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+      .account-num {
+        font-size: 18px;
+        font-weight: bold;
+        color: #1e1b4b;
+        letter-spacing: 0.5px;
       }
-      .member-card {
+      .member-list {
+        margin-bottom: 24px;
+      }
+      .member-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 16px;
-        border: 1px solid #eee;
+        padding: 14px 16px;
+        border: 2px solid #edf2f7;
         border-radius: 12px;
-        background-color: #fafafa;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
       }
-      .member-info .name {
+      .member-item.selected {
+        border-color: #3b82f6;
+        background-color: #f0f7ff;
+      }
+      .member-name {
+        font-weight: 600;
+        font-size: 16px;
+      }
+      .member-amount {
         font-weight: bold;
         font-size: 16px;
-        color: #222;
-      }
-      .member-info .amount {
-        font-size: 14px;
-        color: #ff4d4f;
-        margin-top: 4px;
+        color: #2563eb;
       }
       .btn-group {
         display: flex;
-        gap: 6px;
+        flex-direction: column;
+        gap: 10px;
       }
-      .pay-btn-toss {
-        background-color: #0064ff;
-        color: white;
+      .btn {
+        width: 100%;
+        padding: 16px;
+        border-radius: 12px;
         border: none;
-        padding: 10px 14px;
-        border-radius: 8px;
+        font-size: 15px;
         font-weight: bold;
-        font-size: 13px;
         cursor: pointer;
-        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: transform 0.1s ease;
       }
-      .empty-notice {
-        text-align: center;
-        color: #999;
-        padding: 40px 0;
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn-toss {
+        background-color: #0064ff;
+        color: #ffffff;
+      }
+      .btn-kakao {
+        background-color: #fee500;
+        color: #191919;
+      }
+      .btn-copy {
+        background-color: #f1f5f9;
+        color: #475569;
+      }
+      .toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 23, 42, 0.9);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-size: 13px;
+        display: none;
+        z-index: 100;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>💸 더치페이 정산 요청</h1>
-      <p class="subtitle">본인 이름을 확인하고 정산 금액을 송금해 주세요.</p>
+      <div class="header">
+        <h2>🧾 정산 요청이 도착했습니다</h2>
+        <p>본인의 이름을 클릭하여 정산해 주세요.</p>
+      </div>
 
-      <div id="account-container"></div>
-      <div id="member-container" class="member-list"></div>
+      <!-- 입금 계좌 정보 -->
+      <div class="bank-card">
+        <div class="bank-name" id="bankDisplay">입금 은행</div>
+        <div class="account-num" id="accDisplay">계좌번호</div>
+      </div>
+
+      <!-- 참여자 및 금액 목록 -->
+      <div class="member-list" id="memberList"></div>
+
+      <!-- 송금 실행 버튼 영역 -->
+      <div class="btn-group">
+        <button class="btn btn-toss" onclick="payViaToss()">
+          🔹 토스 앱으로 바로 송금하기
+        </button>
+        <button class="btn btn-kakao" onclick="payViaKakao()">
+          🟡 계좌 복사 후 카카오톡 실행
+        </button>
+        <button class="btn btn-copy" onclick="copyAccountOnly()">
+          📋 계좌번호만 복사하기
+        </button>
+      </div>
     </div>
 
+    <div class="toast" id="toast">계좌번호가 복사되었습니다!</div>
+
     <script>
-      const urlParams = new URLSearchParams(window.location.search);
-      const rawData = urlParams.get("data");
-      const bank = urlParams.get("bank");
-      const acc = urlParams.get("acc");
+      let selectedAmount = 0;
+      let bankName = "";
+      let accountNumber = "";
+      let kakaopayUrl = "";
 
-      const accountContainer = document.getElementById("account-container");
-      const memberContainer = document.getElementById("member-container");
+      // URL Query Parameter 파싱
+      window.onload = function () {
+        const urlParams = new URLSearchParams(window.location.search);
 
-      // 입금 계좌 안내
-      if (bank && acc) {
-        accountContainer.innerHTML = `
-            <div class="account-box">
-                <div class="account-info">
-                    <strong>입금 계좌 안내</strong>
-                    ${bank} ${acc}
-                </div>
-            </div>
-        `;
-      }
+        bankName = urlParams.get("bank") || "토스뱅크";
+        accountNumber = urlParams.get("acc") || "";
+        kakaopayUrl = urlParams.get("kakaopay") || "";
+        const dataStr = urlParams.get("data") || "";
 
-      // 참여자 목록 및 앱 직접 연결 버튼 생성
-      if (rawData) {
-        const members = rawData.split(",");
+        document.getElementById("bankDisplay").innerText = bankName;
+        document.getElementById("accDisplay").innerText =
+          accountNumber || "계좌 정보 없음";
 
-        members.forEach((memberStr) => {
-          const [name, amount] = memberStr.split(":");
-          if (name && amount) {
-            const formattedAmount = Number(amount).toLocaleString();
+        const memberListContainer = document.getElementById("memberList");
 
-            // 토스 앱 딥링크 URL 생성 (은행, 계좌번호, 금액 자동 세팅)
-            const tossScheme = `supertoss://send?bank=${encodeURIComponent(bank || "")}&accountNo=${acc || ""}&amount=${amount}`;
-
-            const card = document.createElement("div");
-            card.className = "member-card";
-            card.innerHTML = `
-                    <div class="member-info">
-                        <div class="name">${name}</div>
-                        <div class="amount">${formattedAmount}원</div>
-                    </div>
-                    <div class="btn-group">
-                        <button class="pay-btn-toss" onclick="sendViaToss('${tossScheme}', '${acc}', '${amount}')">토스로 송금</button>
-                    </div>
-                `;
-            memberContainer.appendChild(card);
-          }
-        });
-      } else {
-        memberContainer.innerHTML = `
-            <div class="empty-notice">
-                정산 정보가 없습니다.<br>올바른 공유 링크로 접속해 주세요.
-            </div>
-        `;
-      }
-
-      function sendViaToss(schemeUrl, accNum, amount) {
-        // 계좌번호 자동 복사 후 토스 앱 실행
-        if (accNum) {
-          navigator.clipboard.writeText(accNum);
+        if (!dataStr) {
+          memberListContainer.innerHTML =
+            '<p style="text-align:center; color:#999;">정산 상세 내역이 없습니다.</p>';
+          return;
         }
 
-        // 토스 앱 호출
-        window.location.href = schemeUrl;
+        // data format: "철수:18000,영희:18000,민수:12000"
+        const members = dataStr.split(",");
+
+        members.forEach((item, index) => {
+          const [name, amtStr] = item.split(":");
+          const amt = parseInt(amtStr || "0", 10);
+
+          const div = document.createElement("div");
+          div.className = "member-item" + (index === 0 ? " selected" : "");
+          div.onclick = function () {
+            document
+              .querySelectorAll(".member-item")
+              .forEach((el) => el.classList.remove("selected"));
+            div.classList.add("selected");
+            selectedAmount = amt;
+          };
+
+          div.innerHTML = `
+                <span class="member-name">${name}</span>
+                <span class="member-amount">${amt.toLocaleString()}원</span>
+            `;
+
+          memberListContainer.appendChild(div);
+
+          if (index === 0) {
+            selectedAmount = amt;
+          }
+        });
+      };
+
+      function showToast(msg) {
+        const toast = document.getElementById("toast");
+        toast.innerText = msg;
+        toast.style.display = "block";
+        setTimeout(() => {
+          toast.style.display = "none";
+        }, 2000);
+      }
+
+      // 1. 토스 딥링크 송금 (계좌 복사 + 토스 자동 열기 + 금액 입력)
+      function payViaToss() {
+        if (!accountNumber) {
+          alert("계좌 정보가 없습니다.");
+          return;
+        }
+
+        const tossUrl = `supertoss://send?bank=${encodeURIComponent(bankName)}&accountNo=${accountNumber}&amount=${selectedAmount}`;
+
+        // 클립보드에 계좌 복사 후 토스 딥링크 실행
+        navigator.clipboard
+          .writeText(`${bankName} ${accountNumber}`)
+          .then(() => {
+            window.location.href = tossUrl;
+          })
+          .catch(() => {
+            window.location.href = tossUrl;
+          });
+      }
+
+      // 2. 카카오톡/카카오페이 송금 (계좌 복사 + 카카오톡 실행)
+      function payViaKakao() {
+        if (!accountNumber) {
+          alert("계좌 정보가 없습니다.");
+          return;
+        }
+
+        const accInfo = `${bankName} ${accountNumber}`;
+
+        navigator.clipboard
+          .writeText(accInfo)
+          .then(() => {
+            showToast("계좌번호가 복사되었습니다!");
+            setTimeout(() => {
+              // 카카오페이 고정 URL이 있는 경우 우선 오픈, 없으면 카카오톡 앱 실행
+              if (kakaopayUrl) {
+                window.location.href = kakaopayUrl;
+              } else {
+                window.location.href = "kakaotalk://";
+              }
+            }, 500);
+          })
+          .catch(() => {
+            alert("복사에 실패했습니다. 계좌: " + accInfo);
+          });
+      }
+
+      // 3. 단순 계좌 복사
+      function copyAccountOnly() {
+        if (!accountNumber) {
+          alert("계좌 정보가 없습니다.");
+          return;
+        }
+        const accInfo = `${bankName} ${accountNumber}`;
+        navigator.clipboard.writeText(accInfo).then(() => {
+          showToast("계좌번호가 복사되었습니다!");
+        });
       }
     </script>
   </body>
