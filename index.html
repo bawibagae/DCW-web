@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8" /><meta name="referrer" content="no-referrer" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0"
     />
     <title>🧾 더치페이 정산 요청</title>
     <style>
@@ -144,7 +144,7 @@
     <div class="container">
       <div class="header">
         <h2>🧾 정산 요청이 도착했습니다</h2>
-        <p>본인의 이름을 클릭하여 정산해 주세요.</p>
+        <p>본인을 선택하세요. 앱 열기만으로 입금 완료 처리되지 않습니다.</p>
       </div>
 
       <!-- 입금 계좌 정보 -->
@@ -159,7 +159,7 @@
       <!-- 송금 실행 버튼 영역 -->
       <div class="btn-group">
         <button class="btn btn-toss" onclick="payViaToss()">
-          🔹 토스 앱으로 바로 송금하기
+          🔹 계좌 복사 후 토스 열기
         </button>
         <button class="btn btn-kakao" onclick="payViaKakao()">
           🟡 계좌 복사 후 카카오톡 실행
@@ -173,184 +173,64 @@
     <div class="toast" id="toast">계좌번호가 복사되었습니다!</div>
 
     <script>
-      let selectedAmount = 0;
-      let bankName = "";
-      let accountNumber = "";
-      let kakaopayUrl = "";
-
-      // URL Query Parameter 파싱
-      window.onload = async function () {
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get("token") || "";
-        const apiBase = urlParams.get("api") || window.location.origin;
-
-        bankName = urlParams.get("bank") || "토스뱅크";
-        accountNumber = urlParams.get("acc") || "";
-        kakaopayUrl = urlParams.get("kakaopay") || "";
-        const dataStr = urlParams.get("data") || "";
-
-        document.getElementById("bankDisplay").innerText = bankName;
-        document.getElementById("accDisplay").innerText =
-          accountNumber || "계좌 정보 없음";
-
-        const memberListContainer = document.getElementById("memberList");
-
-        // 새 정산 링크: ?token=... 로 서버에서 정산 정보를 가져옵니다.
-        if (token) {
-          try {
-            const res = await fetch(
-              `${apiBase}/api/public/settlements/${encodeURIComponent(token)}`
-            );
-            const data = await res.json();
-
-            if (!res.ok) {
-              throw new Error(data.error || "정산 정보를 불러오지 못했습니다.");
-            }
-
-            bankName = data.bank || bankName;
-            accountNumber = data.account || "";
-
-            document.getElementById("bankDisplay").innerText = bankName;
-            document.getElementById("accDisplay").innerText =
-              accountNumber || "계좌 정보 없음";
-
-            memberListContainer.innerHTML = "";
-
-            (data.participants || []).forEach((member, index) => {
-              const amt = Number(member.amount || 0);
-              const div = document.createElement("div");
-              div.className = "member-item" + (index === 0 ? " selected" : "");
-
-              div.onclick = function () {
-                document
-                  .querySelectorAll(".member-item")
-                  .forEach((el) => el.classList.remove("selected"));
-                div.classList.add("selected");
-                selectedAmount = amt;
-              };
-
-              div.innerHTML = `
-                <span class="member-name">${escapeHtml(member.name)}</span>
-                <span class="member-amount">${amt.toLocaleString()}원</span>
-              `;
-
-              memberListContainer.appendChild(div);
-              if (index === 0) selectedAmount = amt;
-            });
-
-            return;
-          } catch (error) {
-            memberListContainer.innerHTML =
-              `<p style="text-align:center; color:#999;">${escapeHtml(error.message)}</p>`;
-            return;
-          }
-        }
-
-        // 기존 data=이름:금액 형식도 호환합니다.
-        if (!dataStr) {
-          memberListContainer.innerHTML =
-            '<p style="text-align:center; color:#999;">정산 상세 내역이 없습니다.</p>';
-          return;
-        }
-
-        const members = dataStr.split(",");
-        members.forEach((item, index) => {
-          const [name, amtStr] = item.split(":");
-          const amt = parseInt(amtStr || "0", 10);
-
-          const div = document.createElement("div");
-          div.className = "member-item" + (index === 0 ? " selected" : "");
-          div.onclick = function () {
-            document
-              .querySelectorAll(".member-item")
-              .forEach((el) => el.classList.remove("selected"));
-            div.classList.add("selected");
-            selectedAmount = amt;
-          };
-
-          div.innerHTML = `
-            <span class="member-name">${escapeHtml(name)}</span>
-            <span class="member-amount">${amt.toLocaleString()}원</span>
-          `;
-
-          memberListContainer.appendChild(div);
-          if (index === 0) selectedAmount = amt;
-        });
-      };
-
-      function escapeHtml(text) {
-        const div = document.createElement("div");
-        div.textContent = text ?? "";
-        return div.innerHTML;
-      }
-
-      function showToast(msg) {
-        const toast = document.getElementById("toast");
-        toast.innerText = msg;
-        toast.style.display = "block";
-        setTimeout(() => {
-          toast.style.display = "none";
-        }, 2000);
-      }
-
-      // 1. 토스 딥링크 송금 (계좌 복사 + 토스 자동 열기 + 금액 입력)
-      function payViaToss() {
-        if (!accountNumber) {
-          alert("계좌 정보가 없습니다.");
-          return;
-        }
-
-        const tossUrl = `supertoss://send?bank=${encodeURIComponent(bankName)}&accountNo=${accountNumber}&amount=${selectedAmount}`;
-
-        // 클립보드에 계좌 복사 후 토스 딥링크 실행
-        navigator.clipboard
-          .writeText(`${bankName} ${accountNumber}`)
-          .then(() => {
-            window.location.href = tossUrl;
-          })
-          .catch(() => {
-            window.location.href = tossUrl;
-          });
-      }
-
-      // 2. 카카오톡/카카오페이 송금 (계좌 복사 + 카카오톡 실행)
-      function payViaKakao() {
-        if (!accountNumber) {
-          alert("계좌 정보가 없습니다.");
-          return;
-        }
-
-        const accInfo = `${bankName} ${accountNumber}`;
-
-        navigator.clipboard
-          .writeText(accInfo)
-          .then(() => {
-            showToast("계좌번호가 복사되었습니다!");
-            setTimeout(() => {
-              // 카카오페이 고정 URL이 있는 경우 우선 오픈, 없으면 카카오톡 앱 실행
-              if (kakaopayUrl) {
-                window.location.href = kakaopayUrl;
-              } else {
-                window.location.href = "kakaotalk://";
-              }
-            }, 500);
-          })
-          .catch(() => {
-            alert("복사에 실패했습니다. 계좌: " + accInfo);
-          });
-      }
-
-      // 3. 단순 계좌 복사
-      function copyAccountOnly() {
-        if (!accountNumber) {
-          alert("계좌 정보가 없습니다.");
-          return;
-        }
-        const accInfo = `${bankName} ${accountNumber}`;
-        navigator.clipboard.writeText(accInfo).then(() => {
-          showToast("계좌번호가 복사되었습니다!");
-        });
-      }
+'use strict';
+const params = new URLSearchParams(location.search);
+const token = params.get('token') || '';
+// Fixed API prevents query-string API substitution and account spoofing.
+const API_BASE = 'https://dcw-6vyo.onrender.com';
+let accountNumber='', bankName='', selectedId=null, selectedAmount=0, members=[];
+let loading=false, fresh=false;
+const list=document.getElementById('memberList');
+const buttons=[...document.querySelectorAll('.btn')];
+function showToast(message){const e=document.getElementById('toast'); e.textContent=message; e.style.display='block';setTimeout(()=>e.style.display='none',3000);}
+function render(){
+ list.replaceChildren();
+ for(const member of members){
+  const button=document.createElement('button'); button.type='button';
+  button.className='member-item'+(member.id===selectedId?' selected':''); button.style.width='100%';
+  const name=document.createElement('span'); name.className='member-name'; name.textContent=member.name;
+  const amount=document.createElement('span'); amount.className='member-amount';
+  amount.textContent=Number(member.amount).toLocaleString()+'원 · '+(member.status==='paid'?'입금 완료':'입금 대기');
+  button.append(name,amount);
+  button.onclick=()=>{selectedId=member.id;selectedAmount=member.amount;render();};
+  list.append(button);
+ }
+ const selected=members.find(x=>x.id===selectedId);
+ buttons[0].disabled=buttons[1].disabled=!fresh || !selected || selected.status==='paid';
+ buttons[2].disabled=!fresh || !accountNumber;
+}
+async function refresh(){
+ if(loading||document.hidden)return; loading=true;
+ const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),65000);
+ try{
+  if(!token)throw new Error('유효한 정산 링크가 필요합니다. 이전 data 형식 링크는 지원하지 않습니다.');
+  const response=await fetch(API_BASE+'/api/public/settlements/'+encodeURIComponent(token),{signal:controller.signal,cache:'no-store',credentials:'omit'});
+  const data=await response.json(); if(!response.ok)throw new Error(data.error||'조회 실패');
+  if(!Array.isArray(data.participants)||!data.participants.length)throw new Error('참여자 정보가 없습니다.');
+  members=data.participants; bankName=data.bank;accountNumber=data.account;fresh=true;
+  document.getElementById('bankDisplay').textContent=bankName;
+  document.getElementById('accDisplay').textContent=accountNumber;
+  render();
+ }catch(error){fresh=false;buttons.forEach(b=>b.disabled=true);list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
+ finally{clearTimeout(timeout);loading=false;}
+}
+async function copy(value){
+ try{if(!navigator.clipboard)throw new Error();await navigator.clipboard.writeText(value);return true;}
+ catch(_){window.prompt('복사할 내용을 길게 눌러 복사하세요.',value);return false;}
+}
+async function copyAccountOnly(){if(!fresh||!accountNumber)return; if(await copy(bankName+' '+accountNumber))showToast('계좌번호가 복사되었습니다.');}
+async function launch(scheme){
+ const member=members.find(x=>x.id===selectedId);
+ if(!fresh||!member||member.status==='paid'){showToast('입금 대기 중인 본인을 선택하세요.');return;}
+ if(!confirm(member.name+' · '+Number(member.amount).toLocaleString()+'원 송금 정보를 확인했나요?'))return;
+ await copy(bankName+' '+accountNumber);
+ showToast('앱이 없으면 열리지 않습니다. 송금 정보는 직접 확인하세요.');
+ location.href=scheme;
+}
+function payViaToss(){return launch('supertoss://');}
+function payViaKakao(){return launch('kakaotalk://');}
+buttons.forEach(b=>b.disabled=true);
+refresh();setInterval(refresh,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
     </script>
   </body>
 </html>
