@@ -1,11 +1,9 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="UTF-8" /><meta name="referrer" content="no-referrer" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta charset="UTF-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>🧾 더치페이 정산 요청</title>
     <style>
       * {
@@ -144,7 +142,10 @@
     <div class="container">
       <div class="header">
         <h2>🧾 정산 요청이 도착했습니다</h2>
-        <p>본인을 선택하고 계좌번호를 먼저 복사하세요. 앱 열기만으로 입금 완료 처리되지 않습니다.</p>
+        <p>
+          본인을 선택한 뒤 송금 방법을 고르세요. 앱이 열리는 것만으로는 입금
+          완료로 처리되지 않습니다.
+        </p>
       </div>
 
       <!-- 입금 계좌 정보 -->
@@ -159,10 +160,10 @@
       <!-- 송금 실행 버튼 영역 -->
       <div class="btn-group">
         <button class="btn btn-toss" onclick="payViaToss()">
-          🔹 토스 열기
+          🔹 토스로 송금하기
         </button>
         <button class="btn btn-kakao" onclick="payViaKakao()">
-          🟡 카카오톡 열기
+          🟡 카카오페이로 송금하기 (계좌 복사)
         </button>
         <button class="btn btn-copy" onclick="copyAccountOnly()">
           📋 계좌번호만 복사하기
@@ -173,69 +174,314 @@
     <div class="toast" id="toast">계좌번호가 복사되었습니다!</div>
 
     <script>
-'use strict';
-const params = new URLSearchParams(location.search);
-const token = params.get('token') || '';
-// Fixed API prevents query-string API substitution and account spoofing.
-const API_BASE = 'https://dcw-6vyo.onrender.com';
-let accountNumber='', bankName='', selectedId=null, selectedAmount=0, members=[];
-let loading=false, fresh=false;
-const list=document.getElementById('memberList');
-const buttons=[...document.querySelectorAll('.btn')];
-function showToast(message){const e=document.getElementById('toast'); e.textContent=message; e.style.display='block';setTimeout(()=>e.style.display='none',3000);}
-function render(){
- list.replaceChildren();
- for(const member of members){
-  const button=document.createElement('button'); button.type='button';
-  button.className='member-item'+(member.id===selectedId?' selected':''); button.style.width='100%';
-  const name=document.createElement('span'); name.className='member-name'; name.textContent=member.name;
-  const amount=document.createElement('span'); amount.className='member-amount';
-  amount.textContent=Number(member.amount).toLocaleString()+'원 · '+(member.status==='paid'?'입금 완료':'입금 대기');
-  button.append(name,amount);
-  button.onclick=()=>{selectedId=member.id;selectedAmount=member.amount;render();};
-  list.append(button);
- }
- const selected=members.find(x=>x.id===selectedId);
- buttons[0].disabled=buttons[1].disabled=!fresh || !selected || selected.status==='paid';
- buttons[2].disabled=!fresh || !accountNumber;
-}
-async function refresh(){
- if(loading||document.hidden)return; loading=true;
- const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),65000);
- try{
-  if(!token)throw new Error('유효한 정산 링크가 필요합니다. 이전 data 형식 링크는 지원하지 않습니다.');
-  const response=await fetch(API_BASE+'/api/public/settlements/'+encodeURIComponent(token),{signal:controller.signal,cache:'no-store',credentials:'omit'});
-  const data=await response.json(); if(!response.ok)throw new Error(data.error||'조회 실패');
-  if(!Array.isArray(data.participants)||!data.participants.length)throw new Error('참여자 정보가 없습니다.');
-  members=data.participants; bankName=data.bank;accountNumber=data.account;fresh=true;
-  document.getElementById('bankDisplay').textContent=bankName;
-  document.getElementById('accDisplay').textContent=accountNumber;
-  render();
- }catch(error){fresh=false;buttons.forEach(b=>b.disabled=true);list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
- finally{clearTimeout(timeout);loading=false;}
-}
-async function copy(value){
- try{if(!navigator.clipboard)throw new Error();await navigator.clipboard.writeText(value);return true;}
- catch(_){window.prompt('복사할 내용을 길게 눌러 복사하세요.',value);return false;}
-}
-async function copyAccountOnly(){if(!fresh||!accountNumber)return; if(await copy(bankName+' '+accountNumber))showToast('계좌번호가 복사되었습니다.');}
-function launch(scheme, packageName, storeURL){
- const member=members.find(x=>x.id===selectedId);
- if(!fresh||!member||member.status==='paid'){showToast('입금 대기 중인 본인을 선택하세요.');return;}
- // Keep navigation synchronous with the user's tap. Copy is a separate action.
- const android=/Android/i.test(navigator.userAgent);
- if(android){
-  location.href='intent://#Intent;scheme='+scheme+';package='+packageName+
-    ';S.browser_fallback_url='+encodeURIComponent(storeURL)+';end';
- }else{
-  location.href=scheme+'://';
- }
- showToast('열리지 않으면 브라우저 메뉴에서 Chrome 또는 Safari로 여세요. 계좌 복사는 별도 버튼을 이용하세요.');
-}
-function payViaToss(){launch('supertoss','viva.republica.toss','https://play.google.com/store/apps/details?id=viva.republica.toss');}
-function payViaKakao(){launch('kakaotalk','com.kakao.talk','https://play.google.com/store/apps/details?id=com.kakao.talk');}
-buttons.forEach(b=>b.disabled=true);
-refresh();setInterval(refresh,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+      "use strict";
+      const params = new URLSearchParams(location.search);
+      const token = params.get("token") || "";
+      // Fixed API prevents query-string API substitution and account spoofing.
+      const API_BASE = "https://dcw-6vyo.onrender.com";
+      let accountNumber = "",
+        bankName = "",
+        selectedId = null,
+        selectedAmount = 0,
+        members = [];
+      let loading = false,
+        fresh = false;
+      const list = document.getElementById("memberList");
+      const buttons = [...document.querySelectorAll(".btn")];
+
+      // ===== 기기 판별 =====
+      const UA = navigator.userAgent;
+      const IS_ANDROID = /Android/i.test(UA);
+      const IS_IOS = /iPhone|iPad|iPod/i.test(UA);
+
+      // ===== 앱 정보 =====
+      const TOSS_PACKAGE = "viva.republica.toss";
+      const KAKAO_PACKAGE = "com.kakao.talk";
+      const TOSS_STORE = IS_IOS
+        ? "https://apps.apple.com/kr/app/id839333328"
+        : "https://play.google.com/store/apps/details?id=viva.republica.toss";
+      const KAKAO_STORE = IS_IOS
+        ? "https://apps.apple.com/kr/app/id362057947"
+        : "https://play.google.com/store/apps/details?id=com.kakao.talk";
+
+      // 앱(main.py)에서 고를 수 있는 은행 → 토스용 은행 이름 / 금융기관 코드
+      const BANKS = {
+        토스뱅크: { toss: "토스뱅크", code: "092" },
+        카카오뱅크: { toss: "카카오뱅크", code: "090" },
+        국민은행: { toss: "국민", code: "004" },
+        신한은행: { toss: "신한", code: "088" },
+        우리은행: { toss: "우리", code: "020" },
+        하나은행: { toss: "하나", code: "081" },
+        농협은행: { toss: "농협", code: "011" },
+      };
+      function bankInfo(name) {
+        const key = String(name || "").trim();
+        return BANKS[key] || { toss: key.replace(/은행$/, ""), code: "" };
+      }
+      function onlyDigits(v) {
+        return String(v || "").replace(/[^0-9]/g, "");
+      }
+
+      // 카카오페이 '계좌송금 화면' 바로 열기(은행·계좌·금액 자동 입력)는
+      // 공식적으로 알림톡 버튼용으로만 안내된 링크라 기본은 꺼둠(false).
+      // true로 바꾸면 송금 화면 진입을 먼저 시도하고, 안 되면 카카오페이 홈 → 카카오톡 순서로 넘어감.
+      const KAKAO_DIRECT_TRANSFER = false;
+
+      function showToast(message) {
+        const e = document.getElementById("toast");
+        e.textContent = message;
+        e.style.display = "block";
+        setTimeout(() => (e.style.display = "none"), 3000);
+      }
+      function render() {
+        list.replaceChildren();
+        for (const member of members) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className =
+            "member-item" + (member.id === selectedId ? " selected" : "");
+          button.style.width = "100%";
+          const name = document.createElement("span");
+          name.className = "member-name";
+          name.textContent = member.name;
+          const amount = document.createElement("span");
+          amount.className = "member-amount";
+          amount.textContent =
+            Number(member.amount).toLocaleString() +
+            "원 · " +
+            (member.status === "paid" ? "입금 완료" : "입금 대기");
+          button.append(name, amount);
+          button.onclick = () => {
+            selectedId = member.id;
+            selectedAmount = member.amount;
+            render();
+          };
+          list.append(button);
+        }
+        const selected = members.find((x) => x.id === selectedId);
+        buttons[0].disabled = buttons[1].disabled =
+          !fresh || !selected || selected.status === "paid";
+        buttons[2].disabled = !fresh || !accountNumber;
+      }
+      async function refresh() {
+        if (loading || document.hidden) return;
+        loading = true;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 65000);
+        try {
+          if (!token)
+            throw new Error(
+              "유효한 정산 링크가 필요합니다. 이전 data 형식 링크는 지원하지 않습니다.",
+            );
+          const response = await fetch(
+            API_BASE + "/api/public/settlements/" + encodeURIComponent(token),
+            {
+              signal: controller.signal,
+              cache: "no-store",
+              credentials: "omit",
+            },
+          );
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "조회 실패");
+          if (!Array.isArray(data.participants) || !data.participants.length)
+            throw new Error("참여자 정보가 없습니다.");
+          members = data.participants;
+          bankName = data.bank;
+          accountNumber = data.account;
+          fresh = true;
+          document.getElementById("bankDisplay").textContent = bankName;
+          document.getElementById("accDisplay").textContent = accountNumber;
+          render();
+        } catch (error) {
+          fresh = false;
+          buttons.forEach((b) => (b.disabled = true));
+          list.replaceChildren();
+          const msg = document.createElement("p");
+          msg.textContent = "조회 실패: " + error.message + " (자동 재시도 중)";
+          list.append(msg);
+        } finally {
+          clearTimeout(timeout);
+          loading = false;
+        }
+      }
+
+      // ===== 복사 =====
+      // 앱으로 이동하기 직전에 쓰는 '즉시 복사'. 기다리지 않아서 터치 직후 바로 앱을 열 수 있음.
+      function copyNow(value) {
+        let ok = false;
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = value;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.top = "-1000px";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          ta.setSelectionRange(0, value.length);
+          ok = document.execCommand("copy");
+          document.body.removeChild(ta);
+        } catch (_) {
+          ok = false;
+        }
+        // 최신 방식도 함께 시도 (결과를 기다리지 않음)
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(value).catch(() => {});
+          ok = true;
+        }
+        return ok;
+      }
+      async function copy(value) {
+        try {
+          if (!navigator.clipboard) throw new Error();
+          await navigator.clipboard.writeText(value);
+          return true;
+        } catch (_) {
+          window.prompt("복사할 내용을 길게 눌러 복사하세요.", value);
+          return false;
+        }
+      }
+      async function copyAccountOnly() {
+        if (!fresh || !accountNumber) return;
+        if (await copy(bankName + " " + accountNumber))
+          showToast("계좌번호가 복사되었습니다.");
+      }
+
+      // ===== 딥링크 열기 =====
+      // url을 열고, waitMs 안에 화면이 앱으로 넘어가지 않으면 '실패'로 보고 onFail 실행
+      function tryOpen(url, onFail, waitMs) {
+        let left = false;
+        const markLeft = () => {
+          left = true;
+        };
+        const onVis = () => {
+          if (document.hidden) left = true;
+        };
+        document.addEventListener("visibilitychange", onVis);
+        window.addEventListener("pagehide", markLeft);
+        window.addEventListener("blur", markLeft);
+        setTimeout(() => {
+          document.removeEventListener("visibilitychange", onVis);
+          window.removeEventListener("pagehide", markLeft);
+          window.removeEventListener("blur", markLeft);
+          if (!left && !document.hidden && onFail) onFail();
+        }, waitMs || 1500);
+        location.href = url;
+      }
+      // 안드로이드용 intent 주소 만들기: scheme://path 를 특정 앱(package)으로 열기
+      function intentURL(scheme, pathAndQuery, packageName, fallbackURL) {
+        return (
+          "intent://" +
+          pathAndQuery +
+          "#Intent;scheme=" +
+          scheme +
+          ";package=" +
+          packageName +
+          (fallbackURL
+            ? ";S.browser_fallback_url=" + encodeURIComponent(fallbackURL)
+            : "") +
+          ";end"
+        );
+      }
+      function selectedMember() {
+        const member = members.find((x) => x.id === selectedId);
+        if (!fresh || !member || member.status === "paid") {
+          showToast("입금 대기 중인 본인을 선택하세요.");
+          return null;
+        }
+        return member;
+      }
+
+      // ===== 토스: 송금 화면을 은행·계좌·금액이 채워진 상태로 열기 =====
+      function payViaToss() {
+        const member = selectedMember();
+        if (!member) return;
+        copyNow(bankName + " " + accountNumber); // 혹시 자동 입력이 안 될 때를 대비해 복사도 해둠
+        const q = new URLSearchParams({
+          bank: bankInfo(bankName).toss,
+          accountNo: onlyDigits(accountNumber),
+          amount: String(onlyDigits(member.amount)),
+        }).toString();
+        const path = "send?" + q;
+        if (IS_ANDROID) {
+          // 토스가 없으면 Play 스토어로 이동
+          location.href = intentURL(
+            "supertoss",
+            path,
+            TOSS_PACKAGE,
+            TOSS_STORE,
+          );
+        } else {
+          tryOpen(
+            "supertoss://" + path,
+            () => {
+              location.href = TOSS_STORE;
+            },
+            1800,
+          );
+        }
+        showToast("토스에서 받는 분과 금액을 확인한 뒤 송금하세요.");
+      }
+
+      // ===== 카카오: 계좌 복사 → 카카오페이 → (실패 시) 카카오톡 =====
+      function payViaKakao() {
+        const member = selectedMember();
+        if (!member) return;
+        const copied = copyNow(bankName + " " + accountNumber);
+        showToast(
+          copied
+            ? "계좌번호를 복사했어요. 카카오페이 송금 화면에 붙여넣으세요."
+            : "복사가 안 됐다면 [계좌번호만 복사하기]를 눌러주세요.",
+        );
+
+        const info = bankInfo(bankName);
+        const steps = [];
+        if (KAKAO_DIRECT_TRANSFER && info.code) {
+          const q = new URLSearchParams({
+            bank_code: info.code,
+            bank_account_number: onlyDigits(accountNumber),
+            amount: String(onlyDigits(member.amount)),
+          }).toString();
+          steps.push(
+            IS_ANDROID
+              ? intentURL(
+                  "kakaotalk",
+                  "kakaopay/money/to/bank?" + q,
+                  KAKAO_PACKAGE,
+                )
+              : "kakaotalk://kakaopay/money/to/bank?" + q,
+          );
+        }
+        // 1순위: 카카오페이 홈 (카카오톡 안의 카카오페이)
+        steps.push(
+          IS_ANDROID
+            ? intentURL("kakaotalk", "kakaopay/home", KAKAO_PACKAGE)
+            : "kakaotalk://kakaopay/home",
+        );
+        // 2순위: 카카오톡 그냥 열기 (없으면 스토어)
+        steps.push(
+          IS_ANDROID
+            ? intentURL("kakaotalk", "", KAKAO_PACKAGE, KAKAO_STORE)
+            : "kakaotalk://",
+        );
+
+        const next = (i) => {
+          if (i >= steps.length) {
+            location.href = KAKAO_STORE;
+            return;
+          }
+          tryOpen(steps[i], () => next(i + 1), 1500);
+        };
+        // 복사가 끝날 시간을 아주 조금 준 뒤 이동
+        setTimeout(() => next(0), 150);
+      }
+
+      buttons.forEach((b) => (b.disabled = true));
+      refresh();
+      setInterval(refresh, 15000);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) refresh();
+      });
     </script>
   </body>
 </html>
