@@ -125,6 +125,10 @@
         background-color: #f1f5f9;
         color: #475569;
       }
+      .btn.inactive { opacity: 0.5; }
+      .external-box { display:none; margin-top:16px; padding:12px; border-radius:8px; background:#fff8e1; color:#5d4037; font-size:13px; line-height:1.5; text-align:center; }
+      .external-box button { margin-top:8px; padding:8px 12px; border:1px solid #8d6e63; border-radius:8px; background:#fff; color:#3e2723; font-size:13px; font-weight:600; }
+      .member-hint { font-size:13px; color:#37474f; margin:4px 0 8px; }
       .toast {
         position: fixed;
         bottom: 30px;
@@ -154,6 +158,7 @@
       </div>
 
       <!-- 참여자 및 금액 목록 -->
+      <p class="member-hint">본인 이름을 먼저 눌러 선택하세요.</p>
       <div class="member-list" id="memberList"></div>
 
       <!-- 송금 실행 버튼 영역 -->
@@ -167,6 +172,10 @@
         <button class="btn btn-copy" onclick="copyAccountOnly()">
           계좌번호만 복사하기
         </button>
+      </div>
+          <div class="external-box" id="externalBox">
+        카카오톡 안에서 앱이 열리지 않으면 아래 버튼으로 크롬에서 다시 열어주세요.<br />
+        <button type="button" onclick="openExternal()">크롬(외부 브라우저)으로 열기</button>
       </div>
     </div>
 
@@ -231,8 +240,9 @@ function render(){
   list.append(button);
  }
  const selected=members.find(x=>x.id===selectedId);
- buttons[0].disabled=buttons[1].disabled=!fresh || !selected || selected.status==='paid';
- buttons[2].disabled=!fresh || !accountNumber;
+ const payReady=fresh && selected && selected.status!=='paid';
+ buttons[0].classList.toggle('inactive',!payReady); buttons[1].classList.toggle('inactive',!payReady);
+ buttons[2].classList.toggle('inactive',!fresh || !accountNumber);
 }
 async function refresh(){
  if(loading||document.hidden)return; loading=true;
@@ -246,7 +256,7 @@ async function refresh(){
   document.getElementById('bankDisplay').textContent=bankName;
   document.getElementById('accDisplay').textContent=accountNumber;
   render();
- }catch(error){fresh=false;buttons.forEach(b=>b.disabled=true);list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
+ }catch(error){fresh=false;buttons.forEach(b=>b.classList.add('inactive'));list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
  finally{clearTimeout(timeout);loading=false;}
 }
 
@@ -270,19 +280,15 @@ async function copy(value){
  try{if(!navigator.clipboard)throw new Error();await navigator.clipboard.writeText(value);return true;}
  catch(_){window.prompt('복사할 내용을 길게 눌러 복사하세요.',value);return false;}
 }
-async function copyAccountOnly(){if(!fresh||!accountNumber)return; if(await copy(bankName+' '+accountNumber))showToast('계좌번호가 복사되었습니다.');}
+async function copyAccountOnly(){if(!fresh||!accountNumber){showToast('정산 정보를 불러오는 중이에요. 잠시 후 다시 눌러주세요.');return;} if(await copy(bankName+' '+accountNumber))showToast('계좌번호가 복사되었습니다.');}
 
 // ===== 딥링크 열기 =====
-// 카카오톡 대화방에서 링크를 누르면 '카카오톡 인앱 브라우저'로 열림
+// 카카오톡 대화방에서 링크를 누르면 '카카오톡 인앱 브라우저(WebView)'로 열림
 const IN_KAKAO = /KAKAOTALK/i.test(UA);
 
-// location.href 대신 숨긴 <a>를 만들어 '클릭' → 인앱 브라우저에서 더 잘 열림
-function openLink(url){
- const a=document.createElement('a');
- a.href=url; a.rel='noopener'; a.style.display='none';
- document.body.appendChild(a); a.click();
- setTimeout(()=>{ if(a.parentNode) a.parentNode.removeChild(a); }, 1000);
-}
+// 앱 열기: 인앱 브라우저(WebView)에서는 location.href 이동이 가장 확실함
+function openLink(url){ window.location.href = url; }
+
 // url을 열고, waitMs 안에 앱으로 넘어가지 않으면(페이지가 안 숨겨지면) onFail 실행
 function tryOpen(url, onFail, waitMs){
  let left=false;
@@ -299,14 +305,22 @@ function tryOpen(url, onFail, waitMs){
  }, waitMs||1500);
  openLink(url);
 }
-// 안드로이드 크롬/삼성인터넷용 intent 주소: scheme://path 를 특정 앱(package)으로 열기
+// 안드로이드용 intent 주소: scheme://path 를 특정 앱(package)으로 열기
+// (크롬·삼성인터넷·카카오톡 인앱 브라우저 모두 intent:// 를 처리함)
 function intentURL(scheme, pathAndQuery, packageName, fallbackURL){
  return 'intent://'+pathAndQuery+'#Intent;scheme='+scheme+';package='+packageName+
         (fallbackURL ? ';S.browser_fallback_url='+encodeURIComponent(fallbackURL) : '')+';end';
 }
+// 버튼이 '아무 반응 없음'이 되지 않도록, 막히는 이유를 항상 안내
 function selectedMember(){
+ if(!fresh){
+  showToast(token ? '정산 정보를 불러오는 중이거나 링크가 만료됐어요. 잠시 후 다시 눌러주세요.'
+                  : '정산 링크가 올바르지 않아요. 앱에서 링크를 다시 받아주세요.');
+  return null;
+ }
  const member=members.find(x=>x.id===selectedId);
- if(!fresh||!member||member.status==='paid'){showToast('먼저 목록에서 본인 이름을 눌러 선택하세요.');return null;}
+ if(!member){ showToast('먼저 위 목록에서 본인 이름을 눌러 선택하세요.'); list.scrollIntoView({behavior:'smooth',block:'center'}); return null; }
+ if(member.status==='paid'){ showToast('이미 입금 완료된 항목이에요.'); return null; }
  return member;
 }
 
@@ -314,19 +328,18 @@ function selectedMember(){
 function payViaToss(){
  const member=selectedMember(); if(!member)return;
  copyNow(bankName+' '+accountNumber); // 자동 입력이 안 될 때 붙여넣기용
- // origin=linkgen : 토스 송금 링크가 쓰는 값. 없으면 송금 화면 대신 홈만 열릴 수 있음
  const q='bank='+encodeURIComponent(bankInfo(bankName).toss)+
          '&accountNo='+onlyDigits(accountNumber)+
          '&origin=linkgen'+
          '&amount='+onlyDigits(member.amount);
- if(IS_ANDROID && !IN_KAKAO){
-  // 크롬/삼성인터넷: intent 방식 (토스 없으면 Play 스토어)
+ showToast('토스를 여는 중… 받는 분과 금액을 확인한 뒤 송금하세요.');
+ if(IS_ANDROID){
+  // 안드로이드(카톡 인앱 포함): intent 방식. 토스가 없으면 Play 스토어로 이동
   openLink(intentURL('supertoss','send?'+q, TOSS_PACKAGE, TOSS_STORE));
  }else{
-  // 아이폰 + 카카오톡 인앱 브라우저: scheme 직접 호출, 안 열리면 스토어
+  // 아이폰: scheme 직접 호출, 안 열리면 App Store
   tryOpen('supertoss://send?'+q, ()=>openLink(TOSS_STORE), 2000);
  }
- showToast('토스에서 받는 분과 금액을 확인한 뒤 송금하세요.');
 }
 
 // ===== 카카오: 계좌 복사 → 카카오페이 → (실패 시) 카카오톡 =====
@@ -339,22 +352,29 @@ function payViaKakao(){
  const steps=[];
  if(KAKAO_DIRECT_TRANSFER && info.code){
   const q='bank_code='+info.code+'&bank_account_number='+onlyDigits(accountNumber)+'&amount='+onlyDigits(member.amount);
-  steps.push('kakaotalk://kakaopay/money/to/bank?'+q);
+  steps.push(IS_ANDROID ? intentURL('kakaotalk','kakaopay/money/to/bank?'+q, KAKAO_PACKAGE) : 'kakaotalk://kakaopay/money/to/bank?'+q);
  }
- // 1순위: 카카오톡 안의 카카오페이 홈 (scheme 직접 호출)
- steps.push('kakaotalk://kakaopay/home');
- // 2순위: 카카오톡 열기 (안드로이드 일반 브라우저는 intent, 없으면 스토어)
- steps.push(IS_ANDROID && !IN_KAKAO ? intentURL('kakaotalk','main', KAKAO_PACKAGE, KAKAO_STORE) : 'kakaotalk://main');
-
- // 첫 번째는 '터치 직후 바로' 열어야 브라우저가 막지 않음 (setTimeout으로 미루지 않음)
+ // 1순위: 카카오톡 안의 카카오페이 홈
+ steps.push(IS_ANDROID ? intentURL('kakaotalk','kakaopay/home', KAKAO_PACKAGE) : 'kakaotalk://kakaopay/home');
+ // 2순위: 카카오톡 열기 (없으면 스토어)
+ steps.push(IS_ANDROID ? intentURL('kakaotalk','main', KAKAO_PACKAGE, KAKAO_STORE) : 'kakaotalk://main');
  const next=(i)=>{
   if(i>=steps.length){ openLink(KAKAO_STORE); return; }
   tryOpen(steps[i], ()=>next(i+1), 1500);
  };
- next(0);
+ next(0); // 터치 직후 바로 실행 (미루면 브라우저가 막음)
 }
 
-buttons.forEach(b=>b.disabled=true);
+// ===== 카카오톡 인앱에서 앱이 안 열릴 때: 크롬 등 외부 브라우저로 다시 열기 =====
+function openExternal(){
+ const url=location.href;
+ if(IN_KAKAO){ openLink('kakaotalk://web/openExternal?url='+encodeURIComponent(url)); }
+ else if(IS_ANDROID){ openLink('intent://'+url.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end'); }
+}
+if(IN_KAKAO){
+ const box=document.getElementById('externalBox'); if(box) box.style.display='block';
+}
+
 refresh();setInterval(refresh,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
     </script>
   </body>
