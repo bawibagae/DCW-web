@@ -142,6 +142,8 @@
         display: none;
         z-index: 100;
       }
+          .btn.pulse { animation: pulse 1.2s ease-in-out 3; }
+      @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(67,97,238,.25); } }
     </style>
   </head>
   <body>
@@ -175,7 +177,7 @@
       </div>
           <div class="external-box" id="externalBox">
         카카오톡 안에서 앱이 열리지 않으면 아래 버튼으로 크롬에서 다시 열어주세요.<br />
-        <button type="button" onclick="openExternal()">크롬(외부 브라우저)으로 열기</button>
+        <button type="button" onclick="openExternal({})">크롬(외부 브라우저)으로 열기</button>
       </div>
     </div>
 
@@ -255,7 +257,7 @@ async function refresh(){
   members=data.participants; bankName=data.bank;accountNumber=data.account;fresh=true;
   document.getElementById('bankDisplay').textContent=bankName;
   document.getElementById('accDisplay').textContent=accountNumber;
-  render();
+  render(); restoreChoice();
  }catch(error){fresh=false;buttons.forEach(b=>b.classList.add('inactive'));list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
  finally{clearTimeout(timeout);loading=false;}
 }
@@ -327,6 +329,7 @@ function selectedMember(){
 // ===== 토스: 송금 화면을 은행·계좌·금액이 채워진 상태로 열기 =====
 function payViaToss(){
  const member=selectedMember(); if(!member)return;
+ if(escapeKakao('toss'))return;
  copyNow(bankName+' '+accountNumber); // 자동 입력이 안 될 때 붙여넣기용
  const q='bank='+encodeURIComponent(bankInfo(bankName).toss)+
          '&accountNo='+onlyDigits(accountNumber)+
@@ -345,6 +348,7 @@ function payViaToss(){
 // ===== 카카오: 계좌 복사 → 카카오페이 → (실패 시) 카카오톡 =====
 function payViaKakao(){
  const member=selectedMember(); if(!member)return;
+ if(escapeKakao('kakao'))return;
  const copied=copyNow(bankName+' '+accountNumber);
  showToast(copied ? '계좌번호를 복사했어요. 카카오페이 송금 화면에 붙여넣으세요.'
                   : '복사가 안 됐다면 [계좌번호만 복사하기]를 눌러주세요.');
@@ -365,14 +369,40 @@ function payViaKakao(){
  next(0); // 터치 직후 바로 실행 (미루면 브라우저가 막음)
 }
 
-// ===== 카카오톡 인앱에서 앱이 안 열릴 때: 크롬 등 외부 브라우저로 다시 열기 =====
-function openExternal(){
- const url=location.href;
+// ===== 카카오톡 인앱 브라우저 → 크롬(외부 브라우저)으로 자동 전환 =====
+// 카카오톡 안의 브라우저(WebView)는 토스 같은 다른 앱을 여는 링크를 막는 경우가 많음.
+// 그래서 카톡에서 링크를 열면 바로 크롬으로 넘겨서, 크롬에서 딥링크가 동작하게 함.
+function externalURL(extra){
+ const u=new URL(location.href);
+ u.searchParams.set('ext','1');                       // 크롬에서 다시 카톡으로 돌아가는 반복 방지
+ Object.entries(extra||{}).forEach(([k,v])=>u.searchParams.set(k,v));
+ return u.toString();
+}
+function openExternal(extra){
+ const url=externalURL(extra);
  if(IN_KAKAO){ openLink('kakaotalk://web/openExternal?url='+encodeURIComponent(url)); }
- else if(IS_ANDROID){ openLink('intent://'+url.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end'); }
+ else if(IS_ANDROID){ openLink('intent://'+url.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='+encodeURIComponent(url)+';end'); }
+}
+// 카톡 안에서 송금 버튼을 누르면: 고른 사람·누른 버튼을 담아 크롬으로 이동
+function escapeKakao(kind){
+ if(!IN_KAKAO) return false;
+ showToast('크롬에서 이어서 열게요…');
+ openExternal({member:String(selectedId), pay:kind});
+ return true;
 }
 if(IN_KAKAO){
  const box=document.getElementById('externalBox'); if(box) box.style.display='block';
+ if(params.get('ext')!=='1'){ setTimeout(()=>openExternal(), 300); }   // 처음 열었을 때 자동으로 크롬으로
+}
+// 크롬에서 열렸을 때: 카톡에서 고른 사람을 그대로 선택하고, 누를 버튼을 강조
+const WANT_MEMBER=params.get('member'), WANT_PAY=params.get('pay');
+function restoreChoice(){
+ if(!WANT_MEMBER || selectedId!==null) return;
+ const m=members.find(x=>String(x.id)===WANT_MEMBER); if(!m) return;
+ selectedId=m.id; selectedAmount=m.amount; render();
+ const btn=WANT_PAY==='kakao'?buttons[1]:buttons[0];
+ btn.classList.add('pulse'); btn.scrollIntoView({behavior:'smooth',block:'center'});
+ showToast((WANT_PAY==='kakao'?'카카오페이':'토스')+' 버튼을 한 번 더 눌러주세요.');
 }
 
 refresh();setInterval(refresh,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
