@@ -98,24 +98,28 @@
       }
       .btn {
         width: 100%;
-        padding: 16px;
-        border-radius: 12px;
-        border: none;
+        min-height: 54px;
+        padding: 15px 18px;
+        border-radius: 14px;
+        border: 1px solid transparent;
         font-size: 15px;
-        font-weight: bold;
+        line-height: 1.35;
+        font-weight: 700;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        transition: transform 0.1s ease;
+        transition: transform .12s ease, filter .12s ease, box-shadow .12s ease;
+        -webkit-tap-highlight-color: transparent;
       }
-      .btn:active {
-        transform: scale(0.98);
-      }
+      .btn:active { transform: scale(.985); filter: brightness(.96); }
+      .btn:focus-visible { outline: 3px solid rgba(67,97,238,.28); outline-offset: 2px; }
+      .btn:disabled, .btn.inactive { opacity: .48; cursor: not-allowed; transform: none; }
       .btn-toss {
         background-color: #0064ff;
         color: #ffffff;
+        box-shadow: 0 2px 5px rgba(0,100,255,.16);
       }
       .btn-kakao {
         background-color: #fee500;
@@ -124,8 +128,10 @@
       .btn-copy {
         background-color: #f1f5f9;
         color: #475569;
+        border-color: #e2e8f0;
+        border-color: #e2e8f0;
       }
-      .btn.inactive { opacity: 0.5; }
+
       .external-box { display:none; margin-top:16px; padding:12px; border-radius:8px; background:#fff8e1; color:#5d4037; font-size:13px; line-height:1.5; text-align:center; }
       .external-box button { margin-top:8px; padding:8px 12px; border:1px solid #8d6e63; border-radius:8px; background:#fff; color:#3e2723; font-size:13px; font-weight:600; }
       .member-hint { font-size:13px; color:#37474f; margin:4px 0 8px; }
@@ -243,8 +249,8 @@ function render(){
  }
  const selected=members.find(x=>x.id===selectedId);
  const payReady=fresh && selected && selected.status!=='paid';
- buttons[0].classList.toggle('inactive',!payReady); buttons[1].classList.toggle('inactive',!payReady);
- buttons[2].classList.toggle('inactive',!fresh || !accountNumber);
+ buttons[0].disabled=!payReady; buttons[1].disabled=!payReady;
+ buttons[2].disabled=!fresh || !accountNumber;
 }
 async function refresh(){
  if(loading||document.hidden)return; loading=true;
@@ -258,7 +264,7 @@ async function refresh(){
   document.getElementById('bankDisplay').textContent=bankName;
   document.getElementById('accDisplay').textContent=accountNumber;
   render(); restoreChoice();
- }catch(error){fresh=false;buttons.forEach(b=>b.classList.add('inactive'));list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
+ }catch(error){fresh=false;buttons.forEach(b=>b.disabled=true);list.replaceChildren();const msg=document.createElement('p');msg.textContent='조회 실패: '+error.message+' (자동 재시도 중)';list.append(msg);}
  finally{clearTimeout(timeout);loading=false;}
 }
 
